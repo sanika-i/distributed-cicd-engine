@@ -1,12 +1,12 @@
 # distributed-cicd-engine
 *A Distributed, Event-Driven CI/CD Platform*
 
-## 📌 Overview
+## Overview
 We are building a distributed CI/CD system that executes pipeline stages (build, test, deploy) across multiple worker nodes using an event-driven architecture. It leverages Kafka for job distribution and Kubernetes for container orchestration, enabling scalable and fault-tolerant pipeline execution.
 
 ---
 
-## 🎯 Objectives
+## Objectives
 - Design a distributed CI/CD pipeline engine  
 - Implement event-driven job scheduling using Kafka  
 - Execute pipelines across containerized workers  
@@ -15,14 +15,14 @@ We are building a distributed CI/CD system that executes pipeline stages (build,
 
 ---
 
-## 🧠 Architecture
+## Architecture
 
 GitHub Push → Webhook → Pipeline Manager → Kafka → Workers → Kubernetes
 
 
 ---
 
-## 🧩 Core Components
+## Core Components
 - **Pipeline Manager**: Parses `pipeline.yaml`, schedules jobs  
 - **Kafka**: Handles distributed job queues  
 - **Workers**: Execute pipeline commands in containers  
@@ -31,7 +31,7 @@ GitHub Push → Webhook → Pipeline Manager → Kafka → Workers → Kubernete
 
 ---
 
-## ⚙️ Pipeline Format
+## Pipeline Format
 ```yaml
 stages: [build, test, deploy]
 

@@ -1,0 +1,16 @@
+version: 1
+
+stages:
+  - build
+  - test
+
+jobs:
+  build:
+    stage: build
+    commands:
+      - echo "Building..."
+
+  test:
+    stage: test
+    commands:
+      - echo "Running tests..."

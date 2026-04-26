@@ -1,4 +1,5 @@
 import subprocess
+
 from app.utils.git import clone_repo
 from app.pipeline.parser import load_pipeline
 from app.pipeline.store import (
@@ -7,6 +8,7 @@ from app.pipeline.store import (
     complete_pipeline
 )
 
+
 def execute_pipeline(pipeline_id, repo_url, branch):
     try:
         repo_path = clone_repo(repo_url, branch)
@@ -14,6 +16,9 @@ def execute_pipeline(pipeline_id, repo_url, branch):
 
         stages = pipeline["stages"]
         jobs = pipeline["jobs"]
+
+        for stage in stages:
+            update_stage(pipeline_id, stage, "pending")
 
         for stage in stages:
             update_stage(pipeline_id, stage, "running")
@@ -32,8 +37,10 @@ def execute_pipeline(pipeline_id, repo_url, branch):
                         )
 
                         add_log(pipeline_id, result.stdout)
+                        add_log(pipeline_id, result.stderr)
 
                         if result.returncode != 0:
+                            add_log(pipeline_id, f"[{stage}] FAILED")
                             update_stage(pipeline_id, stage, "failed")
                             complete_pipeline(pipeline_id, "failed")
                             return

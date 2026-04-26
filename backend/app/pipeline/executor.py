@@ -1,42 +1,47 @@
 import subprocess
+from app.utils.git import clone_repo
+from app.pipeline.parser import load_pipeline
+from app.pipeline.store import (
+    update_stage,
+    add_log,
+    complete_pipeline
+)
 
-def run_commands(commands, cwd):
-    results = []
+def execute_pipeline(pipeline_id, repo_url, branch):
+    try:
+        repo_path = clone_repo(repo_url, branch)
+        pipeline = load_pipeline(repo_path)
 
-    for cmd in commands:
-        print(f"Running {cmd}")
+        stages = pipeline["stages"]
+        jobs = pipeline["jobs"]
 
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            cwd=cwd,
-            capture_output=True,
-            text=True
-        )
+        for stage in stages:
+            update_stage(pipeline_id, stage, "running")
 
-        results.append({
-            "command": cmd,
-            "returncode": result.returncode,
-            "stdout": result.stdout,
-            "stderr": result.stderr
-        })
+            for job_name, job in jobs.items():
+                if job["stage"] == stage:
+                    for cmd in job["commands"]:
+                        add_log(pipeline_id, f"[{stage}] Running: {cmd}")
 
-        if result.returncode != 0:
-            break
-    
-    return results
+                        result = subprocess.run(
+                            cmd,
+                            shell=True,
+                            cwd=repo_path,
+                            capture_output=True,
+                            text=True
+                        )
 
-def run_pipeline_stages(pipeline, repo_path):
-    stages = pipeline["stages"]
-    jobs = pipeline["jobs"]
+                        add_log(pipeline_id, result.stdout)
 
-    execution_log = {}
+                        if result.returncode != 0:
+                            update_stage(pipeline_id, stage, "failed")
+                            complete_pipeline(pipeline_id, "failed")
+                            return
 
-    for stage in stages:
-        for job_name, job in jobs.items():
-            if job["stage"] == stage:
-                result = run_commands(job["commands"], repo_path)
-                execution_log[job_name] = result
+            update_stage(pipeline_id, stage, "success")
 
-    return execution_log
+        complete_pipeline(pipeline_id, "success")
 
+    except Exception as e:
+        add_log(pipeline_id, str(e))
+        complete_pipeline(pipeline_id, "failed")

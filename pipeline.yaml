@@ -7,10 +7,13 @@ stages:
 jobs:
   build:
     stage: build
+    image: docker
     commands:
-      - echo "Building..."
+      - docker --version
 
   test:
     stage: test
+    image: node:18
     commands:
-      - echo "Running tests..."
+      - node -v
+      - npm -v

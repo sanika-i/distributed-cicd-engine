@@ -1,11 +1,17 @@
-import os
-import shutil
+from pathlib import Path
 from git import Repo
 
-def clone_repo(repo_url, branch, dest="repos"):
-    if os.path.exists(dest):
-        shutil.rmtree(dest)
+def clone_repo(repo_url, branch, pipeline_id):
+    base_dir = Path(__file__).resolve().parents[2]  # backend/
+    repos_dir = base_dir / "repos"
 
-    Repo.clone_from(repo_url, dest, branch = branch)
+    repos_dir.mkdir(exist_ok=True)
 
-    return dest
+    dest_path = repos_dir / pipeline_id
+
+    if dest_path.exists():
+        raise Exception(f"Repo already exists for pipeline {pipeline_id}")
+
+    Repo.clone_from(repo_url, str(dest_path), branch=branch)
+
+    return str(dest_path)

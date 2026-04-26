@@ -16,6 +16,7 @@ def validate_pipeline(pipeline):
 
 def load_pipeline(repo_path):
     filepath = os.path.join(repo_path, "pipeline.yaml")
+    print("file path: ", filepath)
 
     if not os.path.exists(filepath):
         raise Exception("pipeline.yaml not found")

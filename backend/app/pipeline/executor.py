@@ -11,12 +11,24 @@ from app.pipeline.store import (
 
 def execute_pipeline(pipeline_id, repo_url, branch):
     try:
-        repo_path = clone_repo(repo_url, branch)
+        update_stage(pipeline_id, "clone", "running")
+        add_log(pipeline_id, "clone", "INFO", f"Cloning repo: {repo_url} (branch: {branch})")
+
+        try:
+            repo_path = clone_repo(repo_url, branch, pipeline_id)
+            add_log(pipeline_id, "clone", "INFO", "Clone successful")
+            update_stage(pipeline_id, "clone", "success")
+        except Exception as e:
+            add_log(pipeline_id, "clone", "ERROR", str(e))
+            update_stage(pipeline_id, "clone", "failed")
+            complete_pipeline(pipeline_id, "failed")
+            return
         pipeline = load_pipeline(repo_path)
 
         stages = pipeline["stages"]
         jobs = pipeline["jobs"]
 
+        # Initialize stages
         for stage in stages:
             update_stage(pipeline_id, stage, "pending")
 
@@ -26,7 +38,7 @@ def execute_pipeline(pipeline_id, repo_url, branch):
             for job_name, job in jobs.items():
                 if job["stage"] == stage:
                     for cmd in job["commands"]:
-                        add_log(pipeline_id, f"[{stage}] Running: {cmd}")
+                        add_log(pipeline_id, stage, "INFO", f"Running: {cmd}")
 
                         result = subprocess.run(
                             cmd,
@@ -36,11 +48,16 @@ def execute_pipeline(pipeline_id, repo_url, branch):
                             text=True
                         )
 
-                        add_log(pipeline_id, result.stdout)
-                        add_log(pipeline_id, result.stderr)
+                        # Log stdout line by line
+                        for line in result.stdout.splitlines():
+                            add_log(pipeline_id, stage, "STDOUT", line)
+
+                        # Log stderr line by line
+                        for line in result.stderr.splitlines():
+                            add_log(pipeline_id, stage, "STDERR", line)
 
                         if result.returncode != 0:
-                            add_log(pipeline_id, f"[{stage}] FAILED")
+                            add_log(pipeline_id, stage, "ERROR", "Command failed")
                             update_stage(pipeline_id, stage, "failed")
                             complete_pipeline(pipeline_id, "failed")
                             return
@@ -50,5 +67,5 @@ def execute_pipeline(pipeline_id, repo_url, branch):
         complete_pipeline(pipeline_id, "success")
 
     except Exception as e:
-        add_log(pipeline_id, str(e))
+        add_log(pipeline_id, "system", "ERROR", str(e))
         complete_pipeline(pipeline_id, "failed")

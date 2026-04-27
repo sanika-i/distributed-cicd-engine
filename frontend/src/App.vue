@@ -1,6 +1,7 @@
-<template>
-  <div class="container">
-    <h1>Distributed CI/CD Dashboard</h1>
-  </div>
-</template>
+<script setup>
+import HelloWorld from './components/HelloWorld.vue'
+</script>
 
+<template>
+  <HelloWorld />
+</template>

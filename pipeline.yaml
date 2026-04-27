@@ -1,0 +1,19 @@
+version: 1
+
+stages:
+  - build
+  - test
+
+jobs:
+  build:
+    stage: build
+    image: docker
+    commands:
+      - docker --version
+
+  test:
+    stage: test
+    image: node:18
+    commands:
+      - node -v
+      - npm -v

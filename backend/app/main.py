@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 from app.pipeline.store import (
     create_pipeline,
     get_pipeline,
@@ -9,6 +10,13 @@ from fastapi import BackgroundTasks
 from app.pipeline.executor import execute_pipeline
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def startup():

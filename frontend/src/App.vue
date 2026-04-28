@@ -1,8 +1,9 @@
 <template>
   <div class="container">
-    <h1>Distributed CI/CD Dashboard</h1>
+    <h1>Jenkins Jr.</h1>
     <PipelineForm @pipeline-started="selectPipeline" />
     <PipelineDetail v-if="selectedPipelineId" :pipeline-id="selectedPipelineId" />
+    <PipelineVisualizer v-if="pipeline" :stages="pipeline.stages" />
   </div>
 </template>
 

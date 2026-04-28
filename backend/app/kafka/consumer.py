@@ -78,9 +78,11 @@ def start_result_consumer():
  
             payload = {
                 "pipeline_id": pipeline_id,
-                "repo_path": state["repo_path"],
-                "stage": next_stage,
-                "jobs": jobs_for_stage
+                "repo_url":    state["repo_url"],
+                "branch":      state["branch"],
+                "commit_sha":  state["commit_sha"],
+                "stage":       next_stage,
+                "jobs":        jobs_for_stage
             }
  
             update_stage(pipeline_id, next_stage, "running")

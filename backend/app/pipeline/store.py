@@ -44,10 +44,12 @@ def init_db():
     # Pipeline State
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pipeline_state (
-        pipeline_id TEXT PRIMARY KEY,
-        repo_path TEXT,
+        pipeline_id     TEXT PRIMARY KEY,
+        repo_url        TEXT,
+        branch          TEXT,
+        commit_sha      TEXT,
         remaining_stages TEXT,
-        pipeline_def TEXT
+        pipeline_def    TEXT
     )
     """)
 
@@ -181,17 +183,18 @@ def list_pipelines():
     conn.close()
     return [{"pipeline_id": r[0], "status": r[1]} for r in rows]
 
-def save_pipeline_state(pipeline_id, repo_path, remaining_stages, pipeline_def):
-    """Persist the pending stage queue so the consumer can advance it."""
+def save_pipeline_state(pipeline_id, repo_url, branch, commit_sha, remaining_stages, pipeline_def):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
     INSERT OR REPLACE INTO pipeline_state
-        (pipeline_id, repo_path, remaining_stages, pipeline_def)
-    VALUES (?, ?, ?, ?)
+        (pipeline_id, repo_url, branch, commit_sha, remaining_stages, pipeline_def)
+    VALUES (?, ?, ?, ?, ?, ?)
     """, (
         pipeline_id,
-        repo_path,
+        repo_url,
+        branch,
+        commit_sha,
         json.dumps(remaining_stages),
         json.dumps(pipeline_def)
     ))
@@ -199,33 +202,30 @@ def save_pipeline_state(pipeline_id, repo_path, remaining_stages, pipeline_def):
     conn.close()
 
 def get_pipeline_state(pipeline_id):
-    """Return (repo_path, remaining_stages, pipeline_def) or None."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT repo_path, remaining_stages, pipeline_def
-    FROM pipeline_state
-    WHERE pipeline_id = ?
+    SELECT repo_url, branch, commit_sha, remaining_stages, pipeline_def
+    FROM pipeline_state WHERE pipeline_id = ?
     """, (pipeline_id,))
     row = cursor.fetchone()
     conn.close()
- 
     if not row:
         return None
- 
     return {
-        "repo_path": row[0],
-        "remaining_stages": json.loads(row[1]),
-        "pipeline_def": json.loads(row[2])
+        "repo_url":         row[0],
+        "branch":           row[1],
+        "commit_sha":       row[2],
+        "remaining_stages": json.loads(row[3]),
+        "pipeline_def":     json.loads(row[4])
     }
 
 def update_pipeline_state(pipeline_id, remaining_stages):
-    """Replace the remaining stage queue after dispatching the next stage."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-    UPDATE pipeline_state SET remaining_stages = ?
-    WHERE pipeline_id = ?
-    """, (json.dumps(remaining_stages), pipeline_id))
+    cursor.execute(
+        "UPDATE pipeline_state SET remaining_stages = ? WHERE pipeline_id = ?",
+        (json.dumps(remaining_stages), pipeline_id)
+    )
     conn.commit()
     conn.close()

@@ -1,8 +1,4 @@
-import subprocess
-import os
-
-from app.utils.git import clone_repo
-from app.pipeline.parser import load_pipeline
+from app.utils.git import resolve_commit_sha, load_pipeline_from_url
 from app.pipeline.store import (
     update_stage,
     add_log,
@@ -14,20 +10,22 @@ from app.kafka.producer import send_job
 def execute_pipeline(pipeline_id, repo_url, branch):
     try:
         add_log(pipeline_id, "system", "INFO", "Pipeline started")
-        update_stage(pipeline_id, "clone", "running")
-        add_log(pipeline_id, "clone", "INFO", f"Cloning repo: {repo_url}")
-
+        add_log(pipeline_id, "system", "INFO", f"Resolving HEAD for branch: {branch}")
         try:
-            repo_path = clone_repo(repo_url, branch, pipeline_id)
-            add_log(pipeline_id, "clone", "INFO", "Clone successful")
-            update_stage(pipeline_id, "clone", "success")
+            commit_sha = resolve_commit_sha(repo_url, branch)
+            add_log(pipeline_id, "system", "INFO", f"Commit: {commit_sha}")
         except Exception as e:
-            add_log(pipeline_id, "clone", "ERROR", str(e))
-            update_stage(pipeline_id, "clone", "failed")
+            add_log(pipeline_id, "system", "ERROR", f"Failed to resolve commit: {e}")
             complete_pipeline(pipeline_id, "failed")
             return
-
-        pipeline = load_pipeline(repo_path)
+ 
+        add_log(pipeline_id, "system", "INFO", "Fetching pipeline.yaml")
+        try:
+            pipeline = load_pipeline_from_url(repo_url, branch)
+        except Exception as e:
+            add_log(pipeline_id, "system", "ERROR", f"Failed to load pipeline.yaml: {e}")
+            complete_pipeline(pipeline_id, "failed")
+            return
 
         stages = pipeline["stages"]
 
@@ -37,9 +35,16 @@ def execute_pipeline(pipeline_id, repo_url, branch):
         first_stage = stages[0]
         remaining = stages[1:]
 
-        save_pipeline_state(pipeline_id, repo_path, remaining, pipeline)
+        save_pipeline_state(
+            pipeline_id,
+            repo_url=repo_url,
+            branch=branch,
+            commit_sha=commit_sha,
+            remaining_stages=remaining,
+            pipeline_def=pipeline
+        )
 
-        _dispatch_stage(pipeline_id, repo_path, pipeline, first_stage)
+        _dispatch_stage(pipeline_id, repo_url, branch, commit_sha, pipeline, first_stage)
 
         add_log(pipeline_id, "system", "INFO", f"Dispatched stage: {first_stage}")
 
@@ -47,7 +52,7 @@ def execute_pipeline(pipeline_id, repo_url, branch):
         add_log(pipeline_id, "system", "ERROR", str(e))
         complete_pipeline(pipeline_id, "failed")
 
-def _dispatch_stage(pipeline_id, repo_path, pipeline, stage):
+def _dispatch_stage(pipeline_id, repo_url, branch, commit_sha, pipeline, stage):
     """Build the single-stage job payload and send it to Kafka."""
     jobs_for_stage = {
         name: job
@@ -57,9 +62,11 @@ def _dispatch_stage(pipeline_id, repo_path, pipeline, stage):
  
     payload = {
         "pipeline_id": pipeline_id,
-        "repo_path": repo_path,
-        "stage": stage,
-        "jobs": jobs_for_stage
+        "repo_url":    repo_url, 
+        "branch":      branch,
+        "commit_sha":  commit_sha,
+        "stage":       stage,
+        "jobs":        jobs_for_stage
     }
  
     update_stage(pipeline_id, stage, "running")

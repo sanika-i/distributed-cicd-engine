@@ -1,11 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from app.pipeline.store import (
     create_pipeline,
     get_pipeline,
     init_db
 )
-from fastapi import BackgroundTasks
 from app.pipeline.executor import execute_pipeline
 from threading import Thread
 from app.kafka.consumer import start_result_consumer

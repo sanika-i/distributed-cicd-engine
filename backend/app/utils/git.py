@@ -2,7 +2,7 @@ from pathlib import Path
 from git import Repo
 
 def clone_repo(repo_url, branch, pipeline_id):
-    base_dir = Path(__file__).resolve().parents[2]  # backend/
+    base_dir = Path(__file__).resolve().parents[2]
     repos_dir = base_dir / "repos"
 
     repos_dir.mkdir(exist_ok=True)

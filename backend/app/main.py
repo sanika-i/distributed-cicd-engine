@@ -7,12 +7,15 @@ from app.pipeline.store import (
 )
 from fastapi import BackgroundTasks
 from app.pipeline.executor import execute_pipeline
+from threading import Thread
+from app.kafka.consumer import start_result_consumer
 
 app = FastAPI()
 
 @app.on_event("startup")
 def startup():
     init_db()
+    Thread(target=start_result_consumer, daemon=True).start()
 
 class PipelineRequest(BaseModel):
     repo_url: str

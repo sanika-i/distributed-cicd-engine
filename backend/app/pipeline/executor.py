@@ -8,28 +8,28 @@ from app.pipeline.store import (
     add_log,
     complete_pipeline
 )
+from app.kafka.producer import send_job
 
+# def run_docker_command(cmd, image, repo_path, pipeline_id, stage):
+#     repo_path = os.path.abspath(repo_path)
 
-def run_docker_command(cmd, image, repo_path, pipeline_id, stage):
-    repo_path = os.path.abspath(repo_path)
+#     docker_cmd = (
+#         f'docker run --rm '
+#         f'-v {repo_path}:/app '
+#         f'-w /app '
+#         f'{image} sh -c "{cmd}"'
+#     )
 
-    docker_cmd = (
-        f'docker run --rm '
-        f'-v {repo_path}:/app '
-        f'-w /app '
-        f'{image} sh -c "{cmd}"'
-    )
+#     add_log(pipeline_id, stage, "INFO", f"Docker: {docker_cmd}")
 
-    add_log(pipeline_id, stage, "INFO", f"Docker: {docker_cmd}")
+#     result = subprocess.run(
+#         docker_cmd,
+#         shell=True,
+#         capture_output=True,
+#         text=True
+#     )
 
-    result = subprocess.run(
-        docker_cmd,
-        shell=True,
-        capture_output=True,
-        text=True
-    )
-
-    return result
+#     return result
 
 
 def execute_pipeline(pipeline_id, repo_url, branch):
@@ -57,44 +57,57 @@ def execute_pipeline(pipeline_id, repo_url, branch):
             update_stage(pipeline_id, stage, "pending")
 
         for stage in stages:
-            update_stage(pipeline_id, stage, "running")
+            update_stage(pipeline_id, stage, "queued")
 
             for job_name, job in jobs.items():
                 if job["stage"] != stage:
                     continue
 
-                image = job.get("image", "ubuntu")
+                job_payload = {
+                    "pipeline_id": pipeline_id,
+                    "stage": stage,
+                    "job_name": job_name,
+                    "repo_path": repo_path,
+                    "commands": job["commands"],
+                    "image": job.get("image", "ubuntu")
+                }
 
-                add_log(pipeline_id, stage, "INFO", f"Starting job: {job_name} (image={image})")
+                send_job(job_payload)
 
-                for cmd in job["commands"]:
-                    add_log(pipeline_id, stage, "INFO", f"Running: {cmd}")
+                add_log(pipeline_id, stage, "INFO", f"Job sent to queue: {job_name}")
 
-                    result = run_docker_command(
-                        cmd,
-                        image,
-                        repo_path,
-                        pipeline_id,
-                        stage
-                    )
+                # image = job.get("image", "ubuntu")
 
-                    for line in result.stdout.splitlines():
-                        add_log(pipeline_id, stage, "STDOUT", line)
+                # add_log(pipeline_id, stage, "INFO", f"Starting job: {job_name} (image={image})")
 
-                    for line in result.stderr.splitlines():
-                        add_log(pipeline_id, stage, "STDERR", line)
+        #         for cmd in job["commands"]:
+        #             add_log(pipeline_id, stage, "INFO", f"Running: {cmd}")
 
-                    if result.returncode != 0:
-                        add_log(pipeline_id, stage, "ERROR", "Command failed")
-                        update_stage(pipeline_id, stage, "failed")
-                        complete_pipeline(pipeline_id, "failed")
-                        return
+        #             result = run_docker_command(
+        #                 cmd,
+        #                 image,
+        #                 repo_path,
+        #                 pipeline_id,
+        #                 stage
+        #             )
 
-                add_log(pipeline_id, stage, "INFO", f"Job completed: {job_name}")
+        #             for line in result.stdout.splitlines():
+        #                 add_log(pipeline_id, stage, "STDOUT", line)
 
-            update_stage(pipeline_id, stage, "success")
+        #             for line in result.stderr.splitlines():
+        #                 add_log(pipeline_id, stage, "STDERR", line)
 
-        complete_pipeline(pipeline_id, "success")
+        #             if result.returncode != 0:
+        #                 add_log(pipeline_id, stage, "ERROR", "Command failed")
+        #                 update_stage(pipeline_id, stage, "failed")
+        #                 complete_pipeline(pipeline_id, "failed")
+        #                 return
+
+        #         add_log(pipeline_id, stage, "INFO", f"Job completed: {job_name}")
+
+        #     update_stage(pipeline_id, stage, "success")
+
+        # complete_pipeline(pipeline_id, "success")
 
     except Exception as e:
         add_log(pipeline_id, "system", "ERROR", str(e))

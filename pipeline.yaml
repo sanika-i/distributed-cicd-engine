@@ -3,17 +3,45 @@ version: 1
 stages:
   - build
   - test
+  - deploy
 
 jobs:
-  build:
+  # ── build stage: two jobs run sequentially ──────────────────────────
+  install_deps:
     stage: build
-    image: docker
+    image: node:18
     commands:
-      - docker --version
+      - npm ci
 
-  test:
+  compile:
+    stage: build
+    image: node:18
+    commands:
+      - npm run build
+
+  # ── test stage: three jobs run sequentially ──────────────────────────
+  lint:
     stage: test
     image: node:18
     commands:
-      - node -v
-      - npm -v
+      - npm run lint
+
+  unit_tests:
+    stage: test
+    image: node:18
+    commands:
+      - npm test -- --coverage
+
+  type_check:
+    stage: test
+    image: node:18
+    commands:
+      - npm run type-check
+
+  # ── deploy stage: one job ────────────────────────────────────────────
+  deploy_k8s:
+    stage: deploy
+    image: bitnami/kubectl:latest
+    commands:
+      - kubectl apply -f k8s/deployment.yaml
+      - kubectl rollout status deployment/myapp

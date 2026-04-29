@@ -11,6 +11,7 @@ jobs:
     image: node:18
     commands:
       - echo "Installing dependencies..."
+      - sleep 5
       - node -v
       - npm -v
 
@@ -19,6 +20,7 @@ jobs:
     image: node:18
     commands:
       - echo "Compiling..."
+      - sleep 5
       - echo "Build complete!"
 
   lint:
@@ -26,6 +28,7 @@ jobs:
     image: node:18
     commands:
       - echo "Running lint..."
+      - sleep 5
       - echo "Lint passed!"
 
   unit_tests:
@@ -33,6 +36,7 @@ jobs:
     image: node:18
     commands:
       - echo "Running unit tests..."
+      - sleep 5
       - echo "All tests passed!"
 
   type_check:
@@ -40,6 +44,7 @@ jobs:
     image: node:18
     commands:
       - echo "Running type check..."
+      - sleep 5
       - echo "Type check passed!"
 
   deploy_k8s:
@@ -47,4 +52,5 @@ jobs:
     image: node:18
     commands:
       - echo "Deploying..."
+      - sleep 5
       - echo "Deploy complete!"

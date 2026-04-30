@@ -1,5 +1,6 @@
 import uuid
 import sqlite3
+import json
 
 DB_NAME = "cicd.db"
 
@@ -37,6 +38,18 @@ def init_db():
         level TEXT,
         message TEXT,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Pipeline State
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS pipeline_state (
+        pipeline_id     TEXT PRIMARY KEY,
+        repo_url        TEXT,
+        branch          TEXT,
+        commit_sha      TEXT,
+        remaining_stages TEXT,
+        pipeline_def    TEXT
     )
     """)
 
@@ -107,6 +120,11 @@ def complete_pipeline(pipeline_id, status):
         (status, pipeline_id)
     )
 
+    cursor.execute(
+        "DELETE FROM pipeline_state WHERE pipeline_id = ?",
+        (pipeline_id,)
+    )
+
     conn.commit()
     conn.close()
 
@@ -156,3 +174,58 @@ def get_pipeline(pipeline_id):
         "stages": stages,
         "logs": logs
     }
+
+def list_pipelines():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, status FROM pipelines ORDER BY rowid DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"pipeline_id": r[0], "status": r[1]} for r in rows]
+
+def save_pipeline_state(pipeline_id, repo_url, branch, commit_sha, remaining_stages, pipeline_def):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT OR REPLACE INTO pipeline_state
+        (pipeline_id, repo_url, branch, commit_sha, remaining_stages, pipeline_def)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        pipeline_id,
+        repo_url,
+        branch,
+        commit_sha,
+        json.dumps(remaining_stages),
+        json.dumps(pipeline_def)
+    ))
+    conn.commit()
+    conn.close()
+
+def get_pipeline_state(pipeline_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT repo_url, branch, commit_sha, remaining_stages, pipeline_def
+    FROM pipeline_state WHERE pipeline_id = ?
+    """, (pipeline_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "repo_url":         row[0],
+        "branch":           row[1],
+        "commit_sha":       row[2],
+        "remaining_stages": json.loads(row[3]),
+        "pipeline_def":     json.loads(row[4])
+    }
+
+def update_pipeline_state(pipeline_id, remaining_stages):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE pipeline_state SET remaining_stages = ? WHERE pipeline_id = ?",
+        (json.dumps(remaining_stages), pipeline_id)
+    )
+    conn.commit()
+    conn.close()

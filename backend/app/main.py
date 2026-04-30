@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from app.pipeline.store import (
@@ -6,8 +6,9 @@ from app.pipeline.store import (
     get_pipeline,
     init_db
 )
-from fastapi import BackgroundTasks
 from app.pipeline.executor import execute_pipeline
+from threading import Thread
+from app.kafka.consumer import start_result_consumer
 
 app = FastAPI()
 app.add_middleware(
@@ -21,6 +22,7 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+    Thread(target=start_result_consumer, daemon=True).start()
 
 class PipelineRequest(BaseModel):
     repo_url: str

@@ -3,17 +3,54 @@ version: 1
 stages:
   - build
   - test
+  - deploy
 
 jobs:
-  build:
+  install_deps:
     stage: build
-    image: docker
+    image: node:18
     commands:
-      - docker --version
+      - echo "Installing dependencies..."
+      - sleep 5
+      - node -v
+      - npm -v
 
-  test:
+  compile:
+    stage: build
+    image: node:18
+    commands:
+      - echo "Compiling..."
+      - sleep 5
+      - echo "Build complete!"
+
+  lint:
     stage: test
     image: node:18
     commands:
-      - node -v
-      - npm -v
+      - echo "Running lint..."
+      - sleep 5
+      - echo "Lint passed!"
+
+  unit_tests:
+    stage: test
+    image: node:18
+    commands:
+      - echo "Running unit tests..."
+      - sleep 5
+      - echo "All tests passed!"
+
+  type_check:
+    stage: test
+    image: node:18
+    commands:
+      - echo "Running type check..."
+      - sleep 5
+      - echo "Type check passed!"
+
+  deploy_k8s:
+    stage: deploy
+    image: node:18
+    commands:
+      - echo "Deploying..."
+      - sleep 5
+      - echo "Deploy complete!"

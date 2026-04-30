@@ -7,6 +7,8 @@ import shutil
 from git import Repo
 from kafka import KafkaConsumer, KafkaProducer
 
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}"
 
 print(f"Worker starting... id={WORKER_ID}")
@@ -15,7 +17,7 @@ print(f"Worker starting... id={WORKER_ID}")
 def _get_consumer():
     return KafkaConsumer(
         "jobs",
-        bootstrap_servers="localhost:9092",
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         value_deserializer=lambda m: json.loads(m.decode("utf-8")),
         auto_offset_reset="latest",
         group_id="worker-group"
@@ -24,7 +26,7 @@ def _get_consumer():
 
 def _get_producer():
     return KafkaProducer(
-        bootstrap_servers="localhost:9092",
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         value_serializer=lambda v: json.dumps(v).encode("utf-8")
     )
 

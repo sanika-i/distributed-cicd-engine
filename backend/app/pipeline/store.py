@@ -1,11 +1,14 @@
 import uuid
 import sqlite3
 import json
+import os
 
-DB_NAME = "cicd.db"
+DB_NAME = os.path.join(os.getenv("DB_DIR", "."), "cicd.db")
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    db_dir = os.getenv("DB_DIR", ".")
+    os.makedirs(db_dir, exist_ok=True)
+    return sqlite3.connect(DB_NAME, check_same_thread=False)
 
 def init_db():
     conn = get_connection()
@@ -229,3 +232,26 @@ def update_pipeline_state(pipeline_id, remaining_stages):
     )
     conn.commit()
     conn.close()
+
+def recover_interrupted_pipelines():
+    """
+    On startup, any pipeline still marked 'running' was interrupted
+    by a previous shutdown. Mark them failed so they don't sit stuck forever.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE pipelines SET status = 'failed'
+        WHERE status = 'running'
+    """)
+    cursor.execute("""
+        DELETE FROM pipeline_state
+        WHERE pipeline_id IN (
+            SELECT id FROM pipelines WHERE status = 'failed'
+        )
+    """)
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    if affected:
+        print(f"[startup] Marked {affected} interrupted pipeline(s) as failed")

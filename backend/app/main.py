@@ -1,7 +1,6 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
 from app.pipeline.store import (
     create_pipeline,
     get_pipeline,
@@ -12,6 +11,11 @@ from app.pipeline.store import (
 from app.pipeline.executor import execute_pipeline
 from threading import Thread, Event
 from app.kafka.consumer import start_result_consumer
+import hmac
+import hashlib
+import os
+
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 app = FastAPI()
 
@@ -70,3 +74,66 @@ def get_status(pipeline_id: str):
 def get_logs(pipeline_id: str):
     pipeline = get_pipeline(pipeline_id)
     return pipeline["logs"] if pipeline else []
+
+@app.post("/webhook")
+async def github_webhook(request: Request, background_tasks: BackgroundTasks):
+    body = await request.body()
+
+    signature_header = request.headers.get("X-Hub-Signature-256")
+
+    if not signature_header:
+        raise HTTPException(status_code=400, detail="Missing signature header")
+
+    if not WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+    expected = "sha256=" + hmac.new(
+        WEBHOOK_SECRET.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, signature_header):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    event_type = request.headers.get("X-GitHub-Event")
+
+    if event_type == "ping":
+        return {"message": "pong"}
+
+    if event_type != "push":
+        return {"message": f"Ignoring event: {event_type}"}
+
+    payload = await request.json()
+
+    ref = payload.get("ref", "")
+    if not ref.startswith("refs/heads/"):
+        return {"message": "Not a branch push, ignoring"}
+
+    branch = ref.replace("refs/heads/", "")
+
+    repo_url = payload["repository"]["clone_url"]
+
+    commit_sha = payload["after"]
+
+    if commit_sha == "0000000000000000000000000000000000000000":
+        return {"message": "Branch deletion, ignoring"}
+
+    pipeline_id = create_pipeline()
+    background_tasks.add_task(
+        execute_pipeline,
+        pipeline_id,
+        repo_url,
+        branch,
+        commit_sha
+    )
+
+    print(f"[webhook] Pipeline {pipeline_id} triggered for {repo_url}@{branch} ({commit_sha[:7]})")
+
+    return {
+        "pipeline_id": pipeline_id,
+        "repo": repo_url,
+        "branch": branch,
+        "commit": commit_sha[:7],
+        "status": "triggered"
+    }

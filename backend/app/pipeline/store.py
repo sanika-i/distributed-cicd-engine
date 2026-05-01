@@ -17,8 +17,12 @@ def init_db():
     # Pipelines table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pipelines (
-        id TEXT PRIMARY KEY,
-        status TEXT
+    id TEXT PRIMARY KEY,
+    status TEXT,
+    repo_name TEXT,
+    branch_name TEXT,
+    commit_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
     """)
 

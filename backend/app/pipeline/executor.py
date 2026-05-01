@@ -7,17 +7,22 @@ from app.pipeline.store import (
 )
 from app.kafka.producer import send_job
 
-def execute_pipeline(pipeline_id, repo_url, branch):
+def execute_pipeline(pipeline_id, repo_url, branch, commit_sha=None):
     try:
         add_log(pipeline_id, "system", "INFO", "Pipeline started")
-        add_log(pipeline_id, "system", "INFO", f"Resolving HEAD for branch: {branch}")
-        try:
-            commit_sha = resolve_commit_sha(repo_url, branch)
-            add_log(pipeline_id, "system", "INFO", f"Commit: {commit_sha}")
-        except Exception as e:
-            add_log(pipeline_id, "system", "ERROR", f"Failed to resolve commit: {e}")
-            complete_pipeline(pipeline_id, "failed")
-            return
+        if not commit_sha:
+            # Manual trigger via /run_pipeline — resolve from GitHub API
+            add_log(pipeline_id, "system", "INFO", f"Resolving HEAD for branch: {branch}")
+            try:
+                commit_sha = resolve_commit_sha(repo_url, branch)
+                add_log(pipeline_id, "system", "INFO", f"Commit: {commit_sha}")
+            except Exception as e:
+                add_log(pipeline_id, "system", "ERROR", f"Failed to resolve commit: {e}")
+                complete_pipeline(pipeline_id, "failed")
+                return
+        else:
+            # Webhook trigger — SHA already known
+            add_log(pipeline_id, "system", "INFO", f"Commit: {commit_sha} (from webhook)")
  
         add_log(pipeline_id, "system", "INFO", "Fetching pipeline.yaml")
         try:

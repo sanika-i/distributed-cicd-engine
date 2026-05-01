@@ -8,7 +8,6 @@ from git import Repo
 from kafka import KafkaConsumer, KafkaProducer
 
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}"
 
 print(f"Worker starting... id={WORKER_ID}")
@@ -30,52 +29,38 @@ def _get_producer():
         value_serializer=lambda v: json.dumps(v).encode("utf-8")
     )
 
+
 def clone_at_commit(repo_url, branch, commit_sha):
-    """
-    Clone the repo into a temp directory and check out the exact commit.
-    Returns the temp dir path — caller is responsible for cleanup.
-    """
     tmpdir = tempfile.mkdtemp(prefix=f"cicd-{commit_sha[:7]}-")
     print(f"  Cloning {repo_url}@{commit_sha[:7]} into {tmpdir}")
- 
     repo = Repo.clone_from(repo_url, tmpdir, branch=branch)
-    repo.git.checkout(commit_sha)   # pin to exact commit
- 
+    repo.git.checkout(commit_sha)
     return tmpdir
 
 
-def run_docker_command(cmd, image, repo_path):
-    repo_path = os.path.abspath(repo_path)
-    docker_cmd = [
-        "docker", "run", "--rm",
-        "-v", f"{repo_path}:/app",
-        "-w", "/app",
-        image,
-        "sh", "-c", cmd 
-    ]
+def run_command(cmd, repo_path):
+    """
+    Run command directly in the repo directory.
+    No Docker needed — the worker container is already isolated.
+    """
     result = subprocess.run(
-        docker_cmd,
-        shell=False,
+        cmd,
+        shell=True,
         capture_output=True,
-        text=True
+        text=True,
+        cwd=repo_path
     )
     return result
 
 
 def execute_stage(stage, jobs, repo_path):
-    """
-    Run all jobs that belong to this stage.
-    Returns (success: bool, logs: list[dict])
-    """
     stage_logs = []
     success = True
 
     for job_name, job in jobs.items():
-        image = job.get("image", "ubuntu")
-
         for cmd in job["commands"]:
             print(f"  [{stage}] running: {cmd}")
-            result = run_docker_command(cmd, image, repo_path)
+            result = run_command(cmd, repo_path)
 
             stage_logs.append({
                 "stdout": result.stdout.strip(),
@@ -86,7 +71,7 @@ def execute_stage(stage, jobs, repo_path):
             if result.returncode != 0:
                 print(f"  [{stage}] command failed (exit {result.returncode})")
                 success = False
-                break 
+                break
 
         if not success:
             break
@@ -111,7 +96,6 @@ for message in consumer:
     print(f"[{WORKER_ID}] picked up stage='{stage}'  pipeline={pipeline_id}")
 
     repo_path = None
-
     try:
         repo_path = clone_at_commit(repo_url, branch, commit_sha)
         success, logs = execute_stage(stage, jobs, repo_path)

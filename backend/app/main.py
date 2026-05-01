@@ -6,20 +6,14 @@ from app.pipeline.store import (
     create_pipeline,
     get_pipeline,
     init_db,
-    recover_interrupted_pipelines
+    recover_interrupted_pipelines,
+    list_pipelines
 )
 from app.pipeline.executor import execute_pipeline
 from threading import Thread, Event
 from app.kafka.consumer import start_result_consumer
 
 app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,6 +56,10 @@ def run_pipeline(req: PipelineRequest, background_tasks: BackgroundTasks):
         "pipeline_id": pipeline_id,
         "status": "started"
     }
+
+@app.get("/pipelines")
+def get_all_pipelines():
+    return list_pipelines()
 
 @app.get("/pipelines/{pipeline_id}")
 def get_status(pipeline_id: str):

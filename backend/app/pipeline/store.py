@@ -1,11 +1,31 @@
 import uuid
 import sqlite3
 import json
+from contextlib import contextmanager
 
 DB_NAME = "cicd.db"
 
 def get_connection():
     return sqlite3.connect(DB_NAME)
+
+
+@contextmanager
+def get_db():
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def add_column_if_missing(cursor, table, column, definition):
+    cursor.execute(f"PRAGMA table_info({table})")
+    columns = [row[1] for row in cursor.fetchall()]
+    if column not in columns:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
 
 def init_db():
     conn = get_connection()
@@ -18,6 +38,11 @@ def init_db():
         status TEXT
     )
     """)
+
+    add_column_if_missing(cursor, 'pipelines', 'repo_id', 'TEXT')
+    add_column_if_missing(cursor, 'pipelines', 'branch', 'TEXT')
+    add_column_if_missing(cursor, 'pipelines', 'commit_sha', 'TEXT')
+    add_column_if_missing(cursor, 'pipelines', 'triggered_by', 'TEXT DEFAULT "manual"')
 
     # Stages table
     cursor.execute("""
@@ -53,8 +78,35 @@ def init_db():
     )
     """)
 
+    # Repositories table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS registered_repos (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        repo_url TEXT UNIQUE NOT NULL,
+        webhook_id TEXT,
+        webhook_secret TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    add_column_if_missing(cursor, 'registered_repos', 'webhook_id', 'TEXT')
+    add_column_if_missing(cursor, 'registered_repos', 'webhook_secret', 'TEXT')
+
+    # Branches table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS registered_branches (
+        id TEXT PRIMARY KEY,
+        repo_id TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        last_pipeline_id TEXT,
+        FOREIGN KEY (repo_id) REFERENCES registered_repos(id)
+    )
+    """)
+
     conn.commit()
     conn.close()
+
 
 
 def create_pipeline():
@@ -229,3 +281,130 @@ def update_pipeline_state(pipeline_id, remaining_stages):
     )
     conn.commit()
     conn.close()
+
+# Repository CRUD
+def create_repo(repo: dict):
+    with get_db() as conn:
+        conn.execute(
+            '''
+            INSERT INTO registered_repos
+            (id, name, repo_url, webhook_id, webhook_secret)
+            VALUES (?, ?, ?, ?, ?)
+            ''',
+            (
+                repo['id'],
+                repo['name'],
+                repo['repo_url'],
+                repo.get('webhook_id'),
+                repo.get('webhook_secret')
+            )
+        )
+
+def create_branch(branch: dict):
+    with get_db() as conn:
+        conn.execute(
+            '''
+            INSERT INTO registered_branches
+            (id, repo_id, branch, last_pipeline_id)
+            VALUES (?, ?, ?, ?)
+            ''',
+            (
+                branch['id'],
+                branch['repo_id'],
+                branch['branch'],
+                branch.get('last_pipeline_id')
+            )
+        )
+
+def list_repos():
+    with get_db() as conn:
+        repos = [dict(row) for row in conn.execute(
+            'SELECT * FROM registered_repos ORDER BY created_at DESC'
+        ).fetchall()]
+
+        for repo in repos:
+            branches = conn.execute(
+            '''
+            SELECT branch, commit_sha, status, triggered_by
+            FROM pipelines
+            WHERE repo_id = ?
+            ORDER BY rowid DESC
+            ''',
+            (repo['id'])
+        ).fetchall()
+            repo["branches"] = [
+            {
+                "branch": branch["branch"],
+                "commit_sha": branch["commit_sha"],
+                "status": branch["status"],
+                "triggered_by": branch["triggered_by"]
+            }
+            for branch in branches
+        ]
+
+        return repos
+    
+def get_repo(repo_id: str):
+    with get_db() as conn:
+        repo = conn.execute(
+            'SELECT * FROM registered_repos WHERE id = ?',
+            (repo_id,)
+        ).fetchone()
+
+        if not repo:
+            return None
+
+        repo_data = dict(repo)
+        branches = conn.execute(
+            '''
+            SELECT rb.*, p.status AS last_pipeline_status,
+                   p.commit_sha, p.created_at AS last_run_at,
+                   p.triggered_by
+            FROM registered_branches rb
+            LEFT JOIN pipelines p ON rb.last_pipeline_id = p.id
+            WHERE rb.repo_id = ?
+            ORDER BY rb.branch
+            ''',
+            (repo_id,)
+        ).fetchall()
+
+        repo_data['branches'] = [dict(row) for row in branches]
+        return repo_data
+
+def get_repo_by_url(repo_url: str):
+    with get_db() as conn:
+        row = conn.execute(
+            'SELECT * FROM registered_repos WHERE repo_url = ?',
+            (repo_url,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def delete_repo(repo_id: str):
+    with get_db() as conn:
+        conn.execute('DELETE FROM registered_branches WHERE repo_id = ?', (repo_id,))
+        conn.execute('DELETE FROM registered_repos WHERE id = ?', (repo_id,))
+
+
+def get_branch(repo_id: str, branch: str):
+    with get_db() as conn:
+        row = conn.execute(
+            '''
+            SELECT * FROM registered_branches
+            WHERE repo_id = ? AND branch = ?
+            ''',
+            (repo_id, branch)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def update_branch_pipeline(repo_id: str, branch: str, pipeline_id: str):
+    with get_db() as conn:
+        conn.execute(
+            '''
+            UPDATE registered_branches
+            SET last_pipeline_id = ?
+            WHERE repo_id = ? AND branch = ?
+            ''',
+            (pipeline_id, repo_id, branch)
+        )

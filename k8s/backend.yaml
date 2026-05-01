@@ -23,6 +23,11 @@ spec:
               value: kafka-kafka-bootstrap.default.svc.cluster.local:9092
             - name: DB_DIR
               value: /app/data
+            - name: WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-secret
+                  key: secret
           volumeMounts:
             - name: data
               mountPath: /app/data

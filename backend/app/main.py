@@ -106,11 +106,15 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
     payload = await request.json()
 
+    repo_name = payload["repository"]["name"]
+
     ref = payload.get("ref", "")
     if not ref.startswith("refs/heads/"):
         return {"message": "Not a branch push, ignoring"}
 
     branch = ref.replace("refs/heads/", "")
+
+    commit_message = payload.get("head_commit", {}).get("message", "")
 
     repo_url = payload["repository"]["clone_url"]
 
@@ -119,7 +123,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     if commit_sha == "0000000000000000000000000000000000000000":
         return {"message": "Branch deletion, ignoring"}
 
-    pipeline_id = create_pipeline()
+    pipeline_id = create_pipeline(repo_name, branch, commit_message)
     background_tasks.add_task(
         execute_pipeline,
         pipeline_id,

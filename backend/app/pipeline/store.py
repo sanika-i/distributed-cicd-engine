@@ -64,16 +64,22 @@ def init_db():
     conn.close()
 
 
-def create_pipeline():
+def create_pipeline(repo_name=None, branch_name=None, commit_message=None):
     pipeline_id = str(uuid.uuid4())
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "INSERT INTO pipelines (id, status) VALUES (?, ?)",
-        (pipeline_id, "running")
-    )
+    cursor.execute("""
+    INSERT INTO pipelines (id, status, repo_name, branch_name, commit_message)
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        pipeline_id,
+        "running",
+        repo_name,
+        branch_name,
+        commit_message
+    ))
 
     conn.commit()
     conn.close()
@@ -187,31 +193,25 @@ def list_pipelines():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT
-            id,
-            status,
-            repo_name,
-            branch_name,
-            commit_message,
-            created_at
-        FROM pipelines
-        ORDER BY created_at DESC
+    SELECT id, status, repo_name, branch_name, commit_message, created_at
+    FROM pipelines
+    ORDER BY created_at DESC
     """)
 
-    rows = cursor.fetchall()
-    conn.close()
+    pipelines = []
 
-    return [
-        {
-            "pipeline_id": row[0],
+    for row in cursor.fetchall():
+        pipelines.append({
+            "id": row[0],
             "status": row[1],
             "repo_name": row[2],
             "branch_name": row[3],
             "commit_message": row[4],
             "created_at": row[5]
-        }
-        for row in rows
-    ]
+        })
+
+    conn.close()
+    return pipelines
 
 def save_pipeline_state(pipeline_id, repo_url, branch, commit_sha, remaining_stages, pipeline_def):
     conn = get_connection()

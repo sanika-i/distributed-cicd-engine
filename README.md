@@ -37,6 +37,9 @@ This design removes manual triggering and enables fully automated CI/CD workflow
 - FastAPI
 - SQLite
 
+### Frontend
+- Vue3 + vite
+
 ### Messaging Queue
 - Apache Kafka
 
@@ -176,6 +179,13 @@ curl -X POST http://127.0.0.1:<PORT>/run_pipeline \
 ```
 
 5. Add this URL as a GitHub webhook
+
+6. Add backend URL in frontend/src/services/api.js
+
+7. Start the frontend
+```bash
+  npm run dev
+```
 
 ---
 

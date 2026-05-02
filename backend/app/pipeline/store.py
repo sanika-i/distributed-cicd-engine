@@ -185,10 +185,18 @@ def get_pipeline(pipeline_id):
 def list_pipelines():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, status FROM pipelines ORDER BY rowid DESC")
+    cursor.execute("SELECT id, status, repo_name, branch, commit_sha, created_at, commit_message FROM pipelines ORDER BY rowid DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"pipeline_id": r[0], "status": r[1]} for r in rows]
+    return [{
+        "pipeline_id": r[0],
+        "status": r[1],
+        "repo_name": r[2],
+        "branch": r[3],
+        "commit_sha": r[4],
+        "created_at": r[5],
+        "commit_message": r[6]
+    } for r in rows]
 
 def save_pipeline_state(pipeline_id, repo_url, branch, commit_sha, remaining_stages, pipeline_def):
     conn = get_connection()

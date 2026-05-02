@@ -255,3 +255,12 @@ This project demonstrates a production-style distributed CI/CD system with:
 - **Strong consistency** using commit-based execution
 
 It reflects real-world system design patterns used in modern CI/CD platforms.
+
+---
+
+## 12. Screenshots
+<img width="2940" height="1762" alt="image" src="https://github.com/user-attachments/assets/c9baabcc-5dbc-4146-b22a-c4408661860a" />
+<img width="2940" height="1762" alt="image" src="https://github.com/user-attachments/assets/f02a27dc-cdd6-42f9-806d-9a29f0b649bc" />
+<img width="1470" height="881" alt="Screenshot 2026-05-02 at 14 12 05" src="https://github.com/user-attachments/assets/5316bb86-2e80-491e-b1d3-372069a6d8b8" />
+
+

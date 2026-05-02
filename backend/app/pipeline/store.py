@@ -144,32 +144,32 @@ def complete_pipeline(pipeline_id, status):
 def get_pipeline(pipeline_id):
     conn = get_connection()
     cursor = conn.cursor()
-
+ 
     cursor.execute(
-        "SELECT status FROM pipelines WHERE id = ?",
+        "SELECT status, repo_name, branch_name, commit_sha, created_at, commit_message FROM pipelines WHERE id = ?",
         (pipeline_id,)
     )
     row = cursor.fetchone()
-
+ 
     if not row:
         conn.close()
         return None
-
-    status = row[0]
-
+ 
+    status, repo_name, branch_name, commit_sha, created_at, commit_message = row[0], row[1], row[2], row[3], row[4], row[5]
+ 
     cursor.execute(
         "SELECT stage_name, status FROM stages WHERE pipeline_id = ?",
         (pipeline_id,)
     )
     stages = {r[0]: r[1] for r in cursor.fetchall()}
-
+ 
     cursor.execute("""
     SELECT stage, level, message, timestamp
     FROM logs
     WHERE pipeline_id = ?
     ORDER BY id
     """, (pipeline_id,))
-
+ 
     logs = [
         {
             "stage": r[0],
@@ -179,11 +179,16 @@ def get_pipeline(pipeline_id):
         }
         for r in cursor.fetchall()
     ]
-
+ 
     conn.close()
-
+ 
     return {
         "status": status,
+        "repo_name": repo_name,
+        "branch_name": branch_name,
+        "commit_sha": commit_sha,
+        "created_at": created_at,
+        "commit_message": commit_message,
         "stages": stages,
         "logs": logs
     }

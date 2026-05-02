@@ -125,6 +125,10 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     # Extract repo URL
     repo_url = payload["repository"]["clone_url"]
 
+    repo_name = payload["repository"]["name"]
+
+    commit_message = payload.get("head_commit", {}).get("message", "")
+
     # Extract commit SHA — GitHub gives us this directly so we don't
     # need to call the GitHub API to resolve it
     commit_sha = payload["after"]
@@ -134,7 +138,11 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"message": "Branch deletion, ignoring"}
 
     # ── 5. Trigger pipeline ─────────────────────────────────────────────
-    pipeline_id = create_pipeline()
+    pipeline_id = create_pipeline(
+    repo_name,
+    branch,
+    commit_message
+    )
     background_tasks.add_task(
         execute_pipeline,
         pipeline_id,

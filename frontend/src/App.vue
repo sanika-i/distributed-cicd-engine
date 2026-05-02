@@ -14,10 +14,10 @@
       <ul v-else class="pipeline-list">
         <li
           v-for="p in pipelines"
-          :key="p.pipeline_id"
+          :key="p.id"
           class="pipeline-item"
-          :class="{ active: selectedId === p.pipeline_id }"
-          @click="selectPipeline(p.pipeline_id)"
+          :class="{ active: selectedId === p.id }"
+          @click="selectPipeline(p.id)"
         >
           <div class="item-top">
             <span class="commit-msg">{{ p.commit_message || p.commit_sha?.slice(0,7) || 'Manual run' }}</span>
@@ -32,11 +32,11 @@
     </aside>
 
     <main class="main-area">
-      <div v-if="!selectedId" class="empty-state">
+      <div v-if="selectedId === null" class="empty-state">
         <div class="empty-icon">⬡</div>
         <p>Select a pipeline run <br> from the sidebar.</p>
       </div>
-      <PipelineDetail v-else :pipeline-id="selectedId" :key="selectedId" />
+      <PipelineDetails v-else :pipeline-id="selectedId"/>
     </main>
 
   </div>
@@ -45,7 +45,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getPipelines } from './services/api'
-import PipelineDetail from './components/PipelineDetails.vue'
+import PipelineDetails from './components/PipelineDetails.vue'
 
 const pipelines   = ref([])
 const selectedId  = ref(null)
@@ -61,7 +61,10 @@ const fetchList = async () => {
   finally { loadingList.value = false }
 }
 
-const selectPipeline = (id) => { selectedId.value = id }
+const selectPipeline = (id) => {
+  console.log("CLICKED ID:", id)
+  selectedId.value = id
+}
 
 onMounted(() => {
   fetchList()

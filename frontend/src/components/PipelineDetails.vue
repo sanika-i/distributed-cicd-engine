@@ -70,6 +70,7 @@ import { getPipeline } from '../services/api'
 import StatusBadge from './StatusBadge.vue'
 
 const props = defineProps({ pipelineId: String })
+console.log("PipelineDetails mounted with ID:", props.pipelineId)
 
 const pipeline = ref(null)
 const logs = ref([])
@@ -84,12 +85,28 @@ const orderedStages = computed(() => {
 
 const fetchPipeline = async () => {
   try {
-    const { data } = await getPipeline(props.pipelineId)
-    pipeline.value = data
-    logs.value = data.logs || []
-    if (data.status === 'success' || data.status === 'failed') {
+    const res = await getPipeline(props.pipelineId)
+    const data = res.data
+
+    const normalized = {
+      stages: data.stages || {},
+      logs: data.logs || [],
+      status: data.status === "success" ? "success" : "running",
+
+      repo_name: "Repo",
+      branch_name: "main",
+      commit_sha: "",
+      commit_message: "",
+      created_at: new Date().toISOString()
+    }
+
+    pipeline.value = normalized
+    logs.value = normalized.logs
+
+    if (normalized.status === "success" || normalized.status === "failed") {
       clearInterval(interval)
     }
+
   } catch (e) {
     error.value = e?.response?.data?.detail || e?.message || 'Failed to load pipeline'
     clearInterval(interval)
@@ -102,6 +119,24 @@ const scrollToBottom = () => {
 
 watch(logs, () => nextTick(scrollToBottom))
 
+watch(
+  () => props.pipelineId,
+  (newId) => {
+    if (!newId) return
+
+    pipeline.value = null
+    logs.value = []
+    error.value = null
+
+    if (interval) clearInterval(interval)
+
+    fetchPipeline()
+
+    interval = setInterval(fetchPipeline, 3000)
+  },
+  { immediate: true }
+)
+
 const formatDate = (ts) => {
   if (!ts) return ''
   return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -112,10 +147,10 @@ const formatTime = (ts) => {
   return new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-onMounted(() => {
-  fetchPipeline()
-  interval = setInterval(fetchPipeline, 3000)
-})
+// onMounted(() => {
+//   fetchPipeline()
+//   interval = setInterval(fetchPipeline, 3000)
+// })
 
 onUnmounted(() => clearInterval(interval))
 </script>

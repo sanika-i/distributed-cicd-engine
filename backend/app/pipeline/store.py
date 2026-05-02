@@ -146,7 +146,7 @@ def get_pipeline(pipeline_id):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT status, repo_name, branch_name, commit_message FROM pipelines WHERE id = ?"
+        "SELECT status, repo_name, branch_name, commit_message FROM pipelines WHERE id = ?",
         (pipeline_id,)
     )
     row = cursor.fetchone()

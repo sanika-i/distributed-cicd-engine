@@ -1,11 +1,14 @@
 import uuid
 import sqlite3
 import json
+import os
 
-DB_NAME = "cicd.db"
+DB_NAME = os.path.join(os.getenv("DB_DIR", "."), "cicd.db")
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    db_dir = os.getenv("DB_DIR", ".")
+    os.makedirs(db_dir, exist_ok=True)
+    return sqlite3.connect(DB_NAME, check_same_thread=False)
 
 def init_db():
     conn = get_connection()
@@ -14,8 +17,12 @@ def init_db():
     # Pipelines table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pipelines (
-        id TEXT PRIMARY KEY,
-        status TEXT
+    id TEXT PRIMARY KEY,
+    status TEXT,
+    repo_name TEXT,
+    branch_name TEXT,
+    commit_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
@@ -57,16 +64,22 @@ def init_db():
     conn.close()
 
 
-def create_pipeline():
+def create_pipeline(repo_name=None, branch_name=None, commit_message=None):
     pipeline_id = str(uuid.uuid4())
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "INSERT INTO pipelines (id, status) VALUES (?, ?)",
-        (pipeline_id, "running")
-    )
+    cursor.execute("""
+    INSERT INTO pipelines (id, status, repo_name, branch_name, commit_message)
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        pipeline_id,
+        "running",
+        repo_name,
+        branch_name,
+        commit_message
+    ))
 
     conn.commit()
     conn.close()
@@ -178,10 +191,27 @@ def get_pipeline(pipeline_id):
 def list_pipelines():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, status FROM pipelines ORDER BY rowid DESC")
-    rows = cursor.fetchall()
+
+    cursor.execute("""
+    SELECT id, status, repo_name, branch_name, commit_message, created_at
+    FROM pipelines
+    ORDER BY created_at DESC
+    """)
+
+    pipelines = []
+
+    for row in cursor.fetchall():
+        pipelines.append({
+            "id": row[0],
+            "status": row[1],
+            "repo_name": row[2],
+            "branch_name": row[3],
+            "commit_message": row[4],
+            "created_at": row[5]
+        })
+
     conn.close()
-    return [{"pipeline_id": r[0], "status": r[1]} for r in rows]
+    return pipelines
 
 def save_pipeline_state(pipeline_id, repo_url, branch, commit_sha, remaining_stages, pipeline_def):
     conn = get_connection()
@@ -229,3 +259,26 @@ def update_pipeline_state(pipeline_id, remaining_stages):
     )
     conn.commit()
     conn.close()
+
+def recover_interrupted_pipelines():
+    """
+    On startup, any pipeline still marked 'running' was interrupted
+    by a previous shutdown. Mark them failed so they don't sit stuck forever.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE pipelines SET status = 'failed'
+        WHERE status = 'running'
+    """)
+    cursor.execute("""
+        DELETE FROM pipeline_state
+        WHERE pipeline_id IN (
+            SELECT id FROM pipelines WHERE status = 'failed'
+        )
+    """)
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    if affected:
+        print(f"[startup] Marked {affected} interrupted pipeline(s) as failed")

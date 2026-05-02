@@ -1,5 +1,9 @@
 # Distributed CI/CD Pipeline System (Mini Jenkins)
 
+## Team Members
+1. Aishwarya Kore
+2. Sanika Indorkar
+
 ## 1. Project Overview
 This project is a distributed CI/CD pipeline system inspired by tools like Jenkins. It is designed to automate the process of building, testing, and executing pipelines across multiple worker nodes in a scalable and distributed manner.
 

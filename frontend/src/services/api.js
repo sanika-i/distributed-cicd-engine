@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:61367'
+  baseURL: "YOUR_BACKEND_URL"
 })
 
 export const getPipelines    = ()     => api.get('/pipelines')

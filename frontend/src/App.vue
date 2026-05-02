@@ -1,7 +1,5 @@
 <template>
   <div class="app-shell">
-
-    <!-- ── Sidebar ───────────────────────────────────────────────── -->
     <aside class="sidebar">
       <div class="sidebar-header">
         <span class="logo-mark">⬡</span>
@@ -27,13 +25,12 @@
           </div>
           <div class="item-meta">
             <span class="meta-chip repo">{{ p.repo_name || '—' }}</span>
-            <span class="meta-chip branch">{{ p.branch || '—' }}</span>
+            <span class="meta-chip branch">{{ p.branch_name || '—' }}</span>
           </div>
         </li>
       </ul>
     </aside>
 
-    <!-- ── Main ──────────────────────────────────────────────────── -->
     <main class="main-area">
       <div v-if="!selectedId" class="empty-state">
         <div class="empty-icon">⬡</div>
@@ -112,7 +109,6 @@ body {
   overflow: hidden;
 }
 
-/* ── Sidebar ── */
 .sidebar {
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
@@ -229,7 +225,6 @@ body {
 .meta-chip.repo   { color: var(--blue); border-color: var(--blue)44; }
 .meta-chip.branch { color: var(--accent); border-color: var(--accent)44; }
 
-/* ── Main ── */
 .main-area {
   flex: 1;
   overflow-y: auto;

@@ -1,13 +1,12 @@
 <template>
   <div class="detail-wrap" v-if="pipeline">
 
-    <!-- ── Top header bar ── -->
     <div class="detail-header">
       <div class="header-left">
         <div class="header-title">
           <span class="repo-name">{{ pipeline.repo_name || 'Unknown Repo' }}</span>
           <span class="sep">/</span>
-          <span class="branch-name">{{ pipeline.branch || 'main' }}</span>
+          <span class="branch-name">{{ pipeline.branch_name || 'main' }}</span>
         </div>
         <div class="commit-line">
           <span class="commit-sha">{{ pipeline.commit_sha?.slice(0, 7) || '—' }}</span>
@@ -20,7 +19,6 @@
       </div>
     </div>
 
-    <!-- ── Stage pipeline track ── -->
     <div class="stage-track-wrap">
       <div class="stage-track">
         <template v-for="(stage, i) in orderedStages" :key="stage.name">
@@ -33,12 +31,12 @@
             </div>
             <div class="stage-label">{{ stage.name }}</div>
           </div>
-          <div v-if="i < orderedStages.length - 1" class="stage-connector" :class="{ lit: stage.status === 'success' }"></div>
+          <div v-if="i < orderedStages.length - 1" class="stage-connector" :class="{ lit: stage.status === 'success' }">
+          </div>
         </template>
       </div>
     </div>
 
-    <!-- ── Log terminal ── -->
     <div class="log-section">
       <div class="log-toolbar">
         <span class="log-title">Execution Logs</span>
@@ -46,12 +44,7 @@
       </div>
       <div class="log-terminal" ref="logEl">
         <div v-if="logs.length === 0" class="log-empty">Waiting for logs…</div>
-        <div
-          v-for="(log, i) in logs"
-          :key="i"
-          class="log-line"
-          :class="log.level.toLowerCase()"
-        >
+        <div v-for="(log, i) in logs" :key="i" class="log-line" :class="log.level.toLowerCase()">
           <span class="log-ts">{{ formatTime(log.timestamp) }}</span>
           <span class="log-stage">{{ log.stage }}</span>
           <span class="log-level" :class="log.level.toLowerCase()">{{ log.level }}</span>
@@ -60,6 +53,10 @@
       </div>
     </div>
 
+  </div>
+
+  <div v-else-if="error" class="detail-loading" style="color: var(--red)">
+    Error: {{ error }}
   </div>
 
   <div v-else class="detail-loading">
@@ -75,9 +72,10 @@ import StatusBadge from './StatusBadge.vue'
 const props = defineProps({ pipelineId: String })
 
 const pipeline = ref(null)
-const logs     = ref([])
-const logEl    = ref(null)
-let interval   = null
+const logs = ref([])
+const logEl = ref(null)
+const error = ref(null)
+let interval = null
 
 const orderedStages = computed(() => {
   if (!pipeline.value?.stages) return []
@@ -89,10 +87,13 @@ const fetchPipeline = async () => {
     const { data } = await getPipeline(props.pipelineId)
     pipeline.value = data
     logs.value = data.logs || []
-    if (pipeline.value.status === 'success' || pipeline.value.status === 'failed') {
+    if (data.status === 'success' || data.status === 'failed') {
       clearInterval(interval)
     }
-  } catch { /* silent */ }
+  } catch (e) {
+    error.value = e?.response?.data?.detail || e?.message || 'Failed to load pipeline'
+    clearInterval(interval)
+  }
 }
 
 const scrollToBottom = () => {
@@ -126,7 +127,6 @@ onUnmounted(() => clearInterval(interval))
   min-height: 100%;
 }
 
-/* ── Header ── */
 .detail-header {
   display: flex;
   align-items: flex-start;
@@ -138,7 +138,11 @@ onUnmounted(() => clearInterval(interval))
   flex-wrap: wrap;
 }
 
-.header-left { display: flex; flex-direction: column; gap: 6px; }
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .header-title {
   display: flex;
@@ -148,9 +152,19 @@ onUnmounted(() => clearInterval(interval))
   font-weight: 600;
 }
 
-.repo-name   { color: var(--text); }
-.sep         { color: var(--muted); }
-.branch-name { color: var(--accent); font-family: var(--mono); font-size: 15px; }
+.repo-name {
+  color: var(--text);
+}
+
+.sep {
+  color: var(--muted);
+}
+
+.branch-name {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 15px;
+}
 
 .commit-line {
   display: flex;
@@ -219,13 +233,36 @@ onUnmounted(() => clearInterval(interval))
   transition: border-color 0.2s, color 0.2s;
 }
 
-.stage-node.success .stage-circle { border-color: var(--green); color: var(--green); }
-.stage-node.failed  .stage-circle { border-color: var(--red);   color: var(--red); }
-.stage-node.running .stage-circle { border-color: var(--yellow); color: var(--yellow); }
-.stage-node.pending .stage-circle { border-color: var(--border); color: var(--muted); }
+.stage-node.success .stage-circle {
+  border-color: var(--green);
+  color: var(--green);
+}
 
-.spin { display: inline-block; animation: rotate 1s linear infinite; }
-@keyframes rotate { to { transform: rotate(360deg); } }
+.stage-node.failed .stage-circle {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.stage-node.running .stage-circle {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+.stage-node.pending .stage-circle {
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.spin {
+  display: inline-block;
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .stage-label {
   font-size: 11px;
@@ -241,9 +278,11 @@ onUnmounted(() => clearInterval(interval))
   margin-bottom: 20px;
   transition: background 0.3s;
 }
-.stage-connector.lit { background: var(--green)66; }
 
-/* ── Logs ── */
+.stage-connector.lit {
+  background: var(--green)66;
+}
+
 .log-section {
   flex: 1;
   display: flex;
@@ -290,7 +329,10 @@ onUnmounted(() => clearInterval(interval))
   scrollbar-color: var(--border) transparent;
 }
 
-.log-empty { color: var(--muted); font-style: italic; }
+.log-empty {
+  color: var(--muted);
+  font-style: italic;
+}
 
 .log-line {
   display: flex;
@@ -298,18 +340,55 @@ onUnmounted(() => clearInterval(interval))
   align-items: baseline;
 }
 
-.log-ts    { color: #3d4252; flex-shrink: 0; font-size: 10px; }
-.log-stage { color: var(--accent); min-width: 60px; flex-shrink: 0; font-size: 11px; }
-.log-level { min-width: 48px; flex-shrink: 0; font-size: 10px; font-weight: 600; }
-.log-msg   { color: #c9d1e0; white-space: pre-wrap; word-break: break-all; }
+.log-ts {
+  color: #3d4252;
+  flex-shrink: 0;
+  font-size: 10px;
+}
 
-.log-level.info   { color: var(--blue); }
-.log-level.stdout { color: var(--green); }
-.log-level.stderr { color: var(--red); }
-.log-level.error  { color: var(--red); }
+.log-stage {
+  color: var(--accent);
+  min-width: 60px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
 
-.log-line.stderr .log-msg { color: var(--red); }
-.log-line.error  .log-msg { color: #f87171; }
+.log-level {
+  min-width: 48px;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.log-msg {
+  color: #c9d1e0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-level.info {
+  color: var(--blue);
+}
+
+.log-level.stdout {
+  color: var(--green);
+}
+
+.log-level.stderr {
+  color: var(--red);
+}
+
+.log-level.error {
+  color: var(--red);
+}
+
+.log-line.stderr .log-msg {
+  color: var(--red);
+}
+
+.log-line.error .log-msg {
+  color: #f87171;
+}
 
 .detail-loading {
   display: flex;
@@ -320,4 +399,3 @@ onUnmounted(() => clearInterval(interval))
   font-family: var(--mono);
 }
 </style>
-

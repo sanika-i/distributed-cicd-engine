@@ -92,11 +92,9 @@ const fetchPipeline = async () => {
       stages: data.stages || {},
       logs: data.logs || [],
       status: data.status === "success" ? "success" : "running",
-
-      repo_name: "Repo",
-      branch_name: "main",
-      commit_sha: "",
-      commit_message: "",
+      repo_name: data.repo_name || "Repo",
+      branch_name: data.branch_name|| "main",
+      commit_message: data.commit_message || "",
       created_at: new Date().toISOString()
     }
 

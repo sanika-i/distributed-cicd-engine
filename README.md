@@ -105,3 +105,4 @@ Frontend will be available at http://localhost:5173
 The project now includes a fully functional single-node CI/CD execution engine with a modern web interface. Users can trigger pipelines, monitor execution progress, and inspect logs in near real time. The next major milestone is transforming the execution engine into a truly distributed system using Kafka and multiple worker nodes.
 
 test
+test

@@ -146,7 +146,7 @@ def get_pipeline(pipeline_id):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT status FROM pipelines WHERE id = ?",
+        "SELECT status, repo_name, branch_name, commit_message FROM pipelines WHERE id = ?"
         (pipeline_id,)
     )
     row = cursor.fetchone()
@@ -155,7 +155,7 @@ def get_pipeline(pipeline_id):
         conn.close()
         return None
 
-    status = row[0]
+    status, repo_name, branch_name, commit_message = row[0], row[1], row[2], row[3]
 
     cursor.execute(
         "SELECT stage_name, status FROM stages WHERE pipeline_id = ?",
@@ -185,7 +185,10 @@ def get_pipeline(pipeline_id):
     return {
         "status": status,
         "stages": stages,
-        "logs": logs
+        "logs": logs,
+        "repo_name": repo_name,
+        "branch_name": branch_name,
+        "commit_message": commit_message,
     }
 
 def list_pipelines():
